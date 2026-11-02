@@ -30,6 +30,7 @@ executable sapiens4
     Command,
     Domain,
     Assets,
+    Automation,
     BuildUI,
     Computer,
     Delegation,
