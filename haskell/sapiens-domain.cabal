@@ -41,6 +41,7 @@ executable sapiens4
     HTTP,
     Management,
     ManagedState,
+    RoutineCommands,
     Memo,
     Population,
     Provider,
