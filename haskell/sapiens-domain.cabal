@@ -40,6 +40,7 @@ executable sapiens4
     Groups,
     HTTP,
     Management,
+    ManagedState,
     Memo,
     Population,
     Provider,
