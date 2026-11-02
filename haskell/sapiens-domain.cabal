@@ -31,6 +31,8 @@ executable sapiens4
     Domain,
     Assets,
     Automation,
+    Composer,
+    GeneratedCode,
     BuildUI,
     Computer,
     Delegation,
