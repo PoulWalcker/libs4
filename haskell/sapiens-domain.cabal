@@ -32,6 +32,7 @@ executable sapiens4
     Assets,
     Automation,
     Composer,
+    Effects,
     GeneratedCode,
     BuildUI,
     Computer,
