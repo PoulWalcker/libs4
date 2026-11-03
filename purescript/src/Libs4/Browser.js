@@ -97,8 +97,8 @@ export const voiceStart = segmentSeconds => onSegment => async () => {
     const source=context.createMediaStreamSource(stream),node=new AudioWorkletNode(context,'s4-voice'),ratio=context.sampleRate/voiceRate;
     const recording=crypto.randomUUID(),size=segmentSeconds*voiceRate,buffer=new Float32Array(size);
     let filled=0,index=0,carry=new Float32Array(0),position=0,stopping=null;
-    const emit=()=>{onSegment({recording,index,startMs:Math.round(index*size*1000/voiceRate),durationMs:Math.round(filled*1000/voiceRate),mime:'audio/wav',data:voiceBase64(voiceWav(buffer.subarray(0,filled),voiceRate))})();index++;filled=0;};
-    const write=sample=>{buffer[filled++]=sample;if(filled===size)emit();};
+    const emit=last=>{onSegment({recording,index,final:last,startMs:Math.round(index*size*1000/voiceRate),durationMs:Math.round(filled*1000/voiceRate),mime:'audio/wav',data:voiceBase64(voiceWav(buffer.subarray(0,filled),voiceRate))})();index++;filled=0;};
+    const write=sample=>{buffer[filled++]=sample;if(filled===size)emit(false);};
     // Downsample by averaging each group of input samples; leftovers carry into the next block.
     node.port.onmessage=event=>{const input=new Float32Array(carry.length+event.data.length);input.set(carry);input.set(event.data,carry.length);
       let p=position;while(p+ratio<=input.length){const a=Math.floor(p),b=Math.floor(p+ratio);let sum=0;for(let k=a;k<b;k++)sum+=input[k];write(b>a?sum/(b-a):input[a]);p+=ratio;}
@@ -107,7 +107,8 @@ export const voiceStart = segmentSeconds => onSegment => async () => {
     return {stop:()=>stopping||(stopping=(async()=>{
       node.port.onmessage=null;source.disconnect();node.disconnect();stream.getTracks().forEach(t=>t.stop());await context.close();
       const durationMs=Math.round((index*size+filled)*1000/voiceRate);
-      if(filled>=voiceRate/2)emit(); // send the last partial minute, skipping scraps under 0.5 s
+      if(filled===0)buffer[filled++]=0; // the last piece always carries a sample, so the host learns the recording ended
+      emit(true);
       return {recording,segments:index,durationMs};})())};
   }catch(error){stream.getTracks().forEach(t=>t.stop());throw error;}
 };
