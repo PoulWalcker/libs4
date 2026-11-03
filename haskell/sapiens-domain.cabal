@@ -57,6 +57,7 @@ executable sapiens4
     Service,
     Store,
     Types,
+    Voice,
     Workspace,
     Wire
   main-is: Main.hs
