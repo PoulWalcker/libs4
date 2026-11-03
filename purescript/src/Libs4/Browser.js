@@ -34,7 +34,45 @@ export const historyBack = () => history.back();
 export const reload = () => location.reload();
 export const confirm = text => () => window.confirm(text);
 export const clipboard = text => () => navigator.clipboard.writeText(text);
-export const chooseFile = accept => limit => () => new Promise((resolve,reject)=>{const input=document.createElement('input');input.type='file';input.accept=accept;input.style.cssText='position:fixed;left:-10000px;top:0;width:1px;height:1px;opacity:0';document.body.appendChild(input);let settled=false;const finish=(fn,value)=>{if(settled)return;settled=true;input.remove();fn(value);};input.addEventListener('cancel',()=>finish(resolve,null));input.addEventListener('change',()=>{const f=input.files[0];if(!f){finish(resolve,null);return;}if(f.size>limit){finish(reject,new Error('File is too large.'));return;}const r=new FileReader();r.onerror=()=>finish(reject,new Error('Could not read this file.'));r.onload=()=>finish(resolve,{name:f.name,mime:f.type,size:f.size,data:String(r.result).split(',')[1]});r.readAsDataURL(f);});input.click();});
+export const chooseFileImpl = accept => limit => () => new Promise((resolve, reject) => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = accept;
+  input.style.cssText = 'position:fixed;left:-10000px;top:0;width:1px;height:1px;opacity:0';
+  document.body.appendChild(input);
+  let settled = false;
+  const finish = (fn, value) => {
+    if (settled) return;
+    settled = true;
+    input.remove();
+    fn(value);
+  };
+  input.addEventListener('cancel', () => finish(resolve, null));
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) { finish(resolve, null); return; }
+    if (file.size > limit) { finish(reject, new Error('File is too large.')); return; }
+    const reader = new FileReader();
+    reader.onerror = () => finish(reject, new Error('Could not read this file.'));
+    reader.onabort = () => finish(reject, new Error('File reading was cancelled.'));
+    reader.onload = () => {
+      if (typeof reader.result !== 'string' || !reader.result.includes(',')) {
+        finish(reject, new Error('Could not read this file.'));
+        return;
+      }
+      finish(resolve, {
+        name: file.name,
+        mime: file.type === '' ? null : file.type,
+        size: file.size,
+        data: reader.result.slice(reader.result.indexOf(',') + 1)
+      });
+    };
+    try { reader.readAsDataURL(file); }
+    catch (error) { finish(reject, error); }
+  });
+  try { input.click(); }
+  catch (error) { finish(reject, error); }
+});
 const readQR=(image,width,height,limit)=>{const c=document.createElement('canvas'),scale=Math.min(1,limit/Math.max(width,height));c.width=Math.round(width*scale);c.height=Math.round(height*scale);const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(image,0,0,c.width,c.height);const q=RemoteVendor.jsQR(x.getImageData(0,0,c.width,c.height).data,c.width,c.height);return {data:q?.data||'',width,height};};
 export const decodeQR = source => limit => async () => {const i=new Image();i.src=source;await i.decode();if(i.naturalWidth*i.naturalHeight>20000000)throw new Error('Image dimensions are too large.');return readQR(i,i.naturalWidth,i.naturalHeight,limit);};
 export const cameraStart = selector => async () => {const c=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false}),v=document.querySelector(selector);if(!v){c.getTracks().forEach(t=>t.stop());throw new Error('Camera view closed.');}v.srcObject=c;await v.play();return c;};
