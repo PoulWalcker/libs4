@@ -34,6 +34,7 @@ executable sapiens4
     Composer,
     Effects,
     GeneratedCode,
+    Kit,
     BuildUI,
     Computer,
     Delegation,
