@@ -19,6 +19,7 @@
             "halogen-subscriptions",
             "integers",
             "maybe",
+            "nullable",
             "numbers",
             "ordered-collections",
             "parallel",
