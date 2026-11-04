@@ -14,6 +14,7 @@ foreign import data Camera :: Type
 foreign import data Response :: Type
 foreign import environment :: Effect Json
 foreign import now :: Effect Number
+foreign import localTimezone :: Effect String
 foreign import uuid :: Effect String
 foreign import request :: String -> String -> String -> Json -> Effect (Promise Json)
 foreign import storageRead :: String -> Effect String
