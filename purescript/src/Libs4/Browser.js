@@ -79,21 +79,24 @@ export const cameraStart = selector => async () => {const c=await navigator.medi
 export const cameraStop = stream => () => stream.getTracks().forEach(t=>t.stop());
 export const cameraQR = selector => limit => () => {const v=document.querySelector(selector);return v?.readyState>=2&&v.videoWidth?readQR(v,v.videoWidth,v.videoHeight,limit):{data:''};};
 const voiceRate=16000;
-const voiceWorklet="registerProcessor('s4-voice',class extends AudioWorkletProcessor{process(inputs){const c=inputs[0]&&inputs[0][0];if(c)this.port.postMessage(c.slice(0));return true;}});";
 const voiceWav=(samples,rate)=>{const v=new DataView(new ArrayBuffer(44+samples.length*2)),tag=(o,s)=>{for(let i=0;i<4;i++)v.setUint8(o+i,s.charCodeAt(i));};
   tag(0,'RIFF');v.setUint32(4,36+samples.length*2,true);tag(8,'WAVE');tag(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
   v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);tag(36,'data');v.setUint32(40,samples.length*2,true);
   for(let i=0;i<samples.length;i++)v.setInt16(44+i*2,Math.max(-1,Math.min(1,samples[i]))*0x7fff,true);return v.buffer;};
 const voiceBase64=buffer=>{const u=new Uint8Array(buffer);let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode(...u.subarray(i,i+0x8000));return btoa(s);};
-// Records the microphone as a series of voice messages: every segmentSeconds, a finished
-// 16 kHz mono WAV segment is handed to onSegment while recording continues.
-export const voiceStart = segmentSeconds => onSegment => async () => {
+// Browser errors (DOMException) become plain Errors so the app can show their real message.
+const voiceError=e=>e instanceof DOMException||!(e instanceof Error)?new Error((e&&e.name?e.name+': ':'')+(e&&e.message?e.message:String(e))):e;
+// Records the microphone as a series of voice pieces: every segmentSeconds, a finished
+// 16 kHz mono WAV piece is handed to onSegment while recording continues; the last one is marked final.
+// The AudioWorklet is loaded from a real same-origin file (workletUrl), which a strict CSP (script-src 'self') allows.
+export const voiceStart = workletUrl => segmentSeconds => onSegment => () => startVoice(workletUrl,segmentSeconds,onSegment).catch(e=>{throw voiceError(e);});
+const startVoice = async (workletUrl,segmentSeconds,onSegment) => {
   if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone is not available here.');
   if(!(segmentSeconds>0))throw new Error('Segment length must be positive.');
   const stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true},video:false});
   try{
-    const context=new AudioContext(),url=URL.createObjectURL(new Blob([voiceWorklet],{type:'text/javascript'}));
-    await context.audioWorklet.addModule(url);URL.revokeObjectURL(url);
+    const context=new AudioContext();
+    await context.audioWorklet.addModule(workletUrl);
     const source=context.createMediaStreamSource(stream),node=new AudioWorkletNode(context,'s4-voice'),ratio=context.sampleRate/voiceRate;
     const recording=crypto.randomUUID(),size=segmentSeconds*voiceRate,buffer=new Float32Array(size);
     let filled=0,index=0,carry=new Float32Array(0),position=0,stopping=null;
@@ -109,7 +112,7 @@ export const voiceStart = segmentSeconds => onSegment => async () => {
       const durationMs=Math.round((index*size+filled)*1000/voiceRate);
       if(filled===0)buffer[filled++]=0; // the last piece always carries a sample, so the host learns the recording ended
       emit(true);
-      return {recording,segments:index,durationMs};})())};
+      return {recording,segments:index,durationMs};})().catch(e=>{throw voiceError(e);}))};
   }catch(error){stream.getTracks().forEach(t=>t.stop());throw error;}
 };
 export const voiceStop = voice => () => voice.stop();

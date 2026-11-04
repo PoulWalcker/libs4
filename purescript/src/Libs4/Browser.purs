@@ -69,7 +69,7 @@ foreign import decodeQR :: String -> Int -> Effect (Promise Json)
 foreign import cameraStart :: String -> Effect (Promise Camera)
 foreign import cameraStop :: Camera -> Effect Unit
 foreign import cameraQR :: String -> Int -> Effect Json
-foreign import voiceStart :: Int -> (Json -> Effect Unit) -> Effect (Promise Voice)
+foreign import voiceStart :: String -> Int -> (Json -> Effect Unit) -> Effect (Promise Voice)
 foreign import voiceStop :: Voice -> Effect (Promise Json)
 foreign import qrImage :: String -> Effect (Promise String)
 foreign import parseMarkup :: String -> Json
