@@ -61,6 +61,7 @@ common host
     Service,
     Store,
     Types,
+    Voice,
     Workspace,
     Wire
   extra-lib-dirs: sodium/src/libsodium/.libs
