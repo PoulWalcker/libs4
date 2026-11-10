@@ -30,6 +30,7 @@ executable sapiens4
     Command,
     Domain,
     RuntimePaths,
+    DataRoot,
     Assets,
     BuildUI,
     Computer,
@@ -44,6 +45,7 @@ executable sapiens4
     Memo,
     Population,
     Provider,
+    Onboarding,
     Bridge,
     Client,
     Crypto,
@@ -70,6 +72,7 @@ executable sapiens-macos
   other-modules:
     Domain,
     RuntimePaths,
+    DataRoot,
     Application,
     Browser,
     Icon,
@@ -88,6 +91,7 @@ executable sapiens-windows
   other-modules:
     Domain,
     RuntimePaths,
+    DataRoot,
     Browser,
     Host,
     Native,
@@ -108,6 +112,7 @@ executable sapiens-windows-probe
   other-modules:
     Domain,
     RuntimePaths,
+    DataRoot,
     Browser,
     Host,
     Native,
