@@ -3,6 +3,11 @@ name: sapiens-domain
 version: 0.2.0.0
 build-type: Simple
 
+flag linux-desktop
+  description: Build the GTK Linux desktop
+  default: False
+  manual: True
+
 common runtime
   default-language: Haskell2010
   default-extensions: OverloadedStrings, ScopedTypeVariables, TupleSections
@@ -23,8 +28,7 @@ executable sapiens-domain
   default-language: Haskell2010
   ghc-options: -O2 -Wall -Werror
 
-executable sapiens4
-  import: runtime
+common host
   hs-source-dirs: ../../../corpora, ../../../corpora/state, ../../../corpora/work, ../../../corpora/work/schedule, ../../../corpora/host, ../../../remote/relay, ../../../remote/control, ../../../remote/protocol, ../../../build
   other-modules:
     Command,
@@ -60,11 +64,26 @@ executable sapiens4
     Service,
     Store,
     Types,
+    Voice,
     Workspace,
     Wire
-  main-is: Main.hs
   extra-lib-dirs: sodium/src/libsodium/.libs
   extra-libraries: sodium
+
+executable sapiens4
+  import: runtime, host
+  main-is: Main.hs
+
+executable sapiens-linux
+  import: runtime, host
+  hs-source-dirs: ../../../environments/linux
+  main-is: LinuxMain.hs
+  if os(linux) && flag(linux-desktop)
+    c-sources: ../../../environments/linux/Desktop.c, ../../../environments/linux/Browser.c
+    pkgconfig-depends: gtk+-3.0 >=3.24, webkit2gtk-4.1 >=2.40, json-glib-1.0
+    cc-options: -Wall -Wextra -Werror
+  else
+    buildable: False
 
 executable sapiens-macos
   import: runtime

@@ -17,6 +17,7 @@ package:
     - integers
     - maybe
     - numbers
+    - nullable
     - ordered-collections
     - prelude
     - refs
