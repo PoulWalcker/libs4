@@ -43,6 +43,7 @@ executable sapiens4
     Memo,
     Population,
     Provider,
+    Onboarding,
     Bridge,
     Client,
     Crypto,
