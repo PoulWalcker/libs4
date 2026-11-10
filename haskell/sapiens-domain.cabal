@@ -29,6 +29,7 @@ executable sapiens4
   other-modules:
     Command,
     Domain,
+    DataRoot,
     Assets,
     BuildUI,
     Computer,
@@ -69,6 +70,7 @@ executable sapiens-macos
   hs-source-dirs: ../../../environments/macos, ../../../corpora/state
   other-modules:
     Domain,
+    DataRoot,
     Application,
     Browser,
     Icon,
@@ -86,6 +88,7 @@ executable sapiens-windows
   hs-source-dirs: ../../../environments/windows, ../../../corpora/state
   other-modules:
     Domain,
+    DataRoot,
     Browser,
     Host,
     Native,
@@ -105,6 +108,7 @@ executable sapiens-windows-probe
   hs-source-dirs: ../../../spec/support, ../../../environments/windows, ../../../corpora/state
   other-modules:
     Domain,
+    DataRoot,
     Browser,
     Host,
     Native,
