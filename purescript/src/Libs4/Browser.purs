@@ -1,13 +1,17 @@
 module Libs4.Browser where
 
 import Prelude
-import Control.Promise (Promise)
+import Control.Promise (Promise, toAffE)
 import Data.Argonaut.Core (Json)
+import Data.Maybe (Maybe)
+import Data.Nullable (Nullable, toMaybe)
 import Effect (Effect)
+import Effect.Aff (Aff)
 import Web.Event.Event (Event)
 
 foreign import data Socket :: Type
 foreign import data Camera :: Type
+foreign import data Voice :: Type
 foreign import data Response :: Type
 foreign import environment :: Effect Json
 foreign import now :: Effect Number
@@ -42,11 +46,31 @@ foreign import historyBack :: Effect Unit
 foreign import reload :: Effect Unit
 foreign import confirm :: String -> Effect Boolean
 foreign import clipboard :: String -> Effect (Promise Unit)
-foreign import chooseFile :: String -> Int -> Effect (Promise Json)
+type FileSelection =
+  { name :: String
+  , mime :: Maybe String
+  , size :: Number
+  , data :: String
+  }
+
+foreign import chooseFileImpl :: String -> Int -> Effect (Promise (Nullable
+  { name :: String
+  , mime :: Nullable String
+  , size :: Number
+  , data :: String
+  }))
+
+chooseFile :: String -> Int -> Aff (Maybe FileSelection)
+chooseFile accept limit = do
+  selected <- toAffE $ chooseFileImpl accept limit
+  pure $ map (\file -> file {mime = toMaybe file.mime}) $ toMaybe selected
+
 foreign import decodeQR :: String -> Int -> Effect (Promise Json)
 foreign import cameraStart :: String -> Effect (Promise Camera)
 foreign import cameraStop :: Camera -> Effect Unit
 foreign import cameraQR :: String -> Int -> Effect Json
+foreign import voiceStart :: String -> Int -> (Json -> Effect Unit) -> Effect (Promise Voice)
+foreign import voiceStop :: Voice -> Effect (Promise Json)
 foreign import qrImage :: String -> Effect (Promise String)
 foreign import parseMarkup :: String -> Json
 foreign import parseURL :: String -> String -> Json

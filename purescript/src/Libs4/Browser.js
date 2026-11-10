@@ -34,12 +34,88 @@ export const historyBack = () => history.back();
 export const reload = () => location.reload();
 export const confirm = text => () => window.confirm(text);
 export const clipboard = text => () => navigator.clipboard.writeText(text);
-export const chooseFile = accept => limit => () => new Promise((resolve,reject)=>{const input=document.createElement('input');input.type='file';input.accept=accept;input.oncancel=()=>resolve(null);input.onchange=()=>{const f=input.files[0];if(!f){resolve(null);return;}if(f.size>limit){reject(new Error('File is too large.'));return;}const r=new FileReader();r.onerror=()=>reject(new Error('Could not read this file.'));r.onload=()=>resolve({name:f.name,mime:f.type,size:f.size,data:r.result.split(',')[1]});r.readAsDataURL(f);};input.click();});
+export const chooseFileImpl = accept => limit => () => new Promise((resolve, reject) => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = accept;
+  input.style.cssText = 'position:fixed;left:-10000px;top:0;width:1px;height:1px;opacity:0';
+  document.body.appendChild(input);
+  let settled = false;
+  const finish = (fn, value) => {
+    if (settled) return;
+    settled = true;
+    input.remove();
+    fn(value);
+  };
+  input.addEventListener('cancel', () => finish(resolve, null));
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) { finish(resolve, null); return; }
+    if (file.size > limit) { finish(reject, new Error('File is too large.')); return; }
+    const reader = new FileReader();
+    reader.onerror = () => finish(reject, new Error('Could not read this file.'));
+    reader.onabort = () => finish(reject, new Error('File reading was cancelled.'));
+    reader.onload = () => {
+      if (typeof reader.result !== 'string' || !reader.result.includes(',')) {
+        finish(reject, new Error('Could not read this file.'));
+        return;
+      }
+      finish(resolve, {
+        name: file.name,
+        mime: file.type === '' ? null : file.type,
+        size: file.size,
+        data: reader.result.slice(reader.result.indexOf(',') + 1)
+      });
+    };
+    try { reader.readAsDataURL(file); }
+    catch (error) { finish(reject, error); }
+  });
+  try { input.click(); }
+  catch (error) { finish(reject, error); }
+});
 const readQR=(image,width,height,limit)=>{const c=document.createElement('canvas'),scale=Math.min(1,limit/Math.max(width,height));c.width=Math.round(width*scale);c.height=Math.round(height*scale);const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(image,0,0,c.width,c.height);const q=RemoteVendor.jsQR(x.getImageData(0,0,c.width,c.height).data,c.width,c.height);return {data:q?.data||'',width,height};};
 export const decodeQR = source => limit => async () => {const i=new Image();i.src=source;await i.decode();if(i.naturalWidth*i.naturalHeight>20000000)throw new Error('Image dimensions are too large.');return readQR(i,i.naturalWidth,i.naturalHeight,limit);};
 export const cameraStart = selector => async () => {const c=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false}),v=document.querySelector(selector);if(!v){c.getTracks().forEach(t=>t.stop());throw new Error('Camera view closed.');}v.srcObject=c;await v.play();return c;};
 export const cameraStop = stream => () => stream.getTracks().forEach(t=>t.stop());
 export const cameraQR = selector => limit => () => {const v=document.querySelector(selector);return v?.readyState>=2&&v.videoWidth?readQR(v,v.videoWidth,v.videoHeight,limit):{data:''};};
+const voiceRate=16000;
+const voiceWav=(samples,rate)=>{const v=new DataView(new ArrayBuffer(44+samples.length*2)),tag=(o,s)=>{for(let i=0;i<4;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  tag(0,'RIFF');v.setUint32(4,36+samples.length*2,true);tag(8,'WAVE');tag(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);tag(36,'data');v.setUint32(40,samples.length*2,true);
+  for(let i=0;i<samples.length;i++)v.setInt16(44+i*2,Math.max(-1,Math.min(1,samples[i]))*0x7fff,true);return v.buffer;};
+const voiceBase64=buffer=>{const u=new Uint8Array(buffer);let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode(...u.subarray(i,i+0x8000));return btoa(s);};
+// Browser errors (DOMException) become plain Errors so the app can show their real message.
+const voiceError=e=>e instanceof DOMException||!(e instanceof Error)?new Error((e&&e.name?e.name+': ':'')+(e&&e.message?e.message:String(e))):e;
+// Records the microphone as a series of voice pieces: every segmentSeconds, a finished
+// 16 kHz mono WAV piece is handed to onSegment while recording continues; the last one is marked final.
+// The AudioWorklet is loaded from a real same-origin file (workletUrl), which a strict CSP (script-src 'self') allows.
+export const voiceStart = workletUrl => segmentSeconds => onSegment => () => startVoice(workletUrl,segmentSeconds,onSegment).catch(e=>{throw voiceError(e);});
+const startVoice = async (workletUrl,segmentSeconds,onSegment) => {
+  if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone is not available here.');
+  if(!(segmentSeconds>0))throw new Error('Segment length must be positive.');
+  const stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true},video:false});
+  try{
+    const context=new AudioContext();
+    await context.audioWorklet.addModule(workletUrl);
+    const source=context.createMediaStreamSource(stream),node=new AudioWorkletNode(context,'s4-voice'),ratio=context.sampleRate/voiceRate;
+    const recording=crypto.randomUUID(),size=segmentSeconds*voiceRate,buffer=new Float32Array(size);
+    let filled=0,index=0,carry=new Float32Array(0),position=0,stopping=null;
+    const emit=last=>{onSegment({recording,index,final:last,startMs:Math.round(index*size*1000/voiceRate),durationMs:Math.round(filled*1000/voiceRate),mime:'audio/wav',data:voiceBase64(voiceWav(buffer.subarray(0,filled),voiceRate))})();index++;filled=0;};
+    const write=sample=>{buffer[filled++]=sample;if(filled===size)emit(false);};
+    // Downsample by averaging each group of input samples; leftovers carry into the next block.
+    node.port.onmessage=event=>{const input=new Float32Array(carry.length+event.data.length);input.set(carry);input.set(event.data,carry.length);
+      let p=position;while(p+ratio<=input.length){const a=Math.floor(p),b=Math.floor(p+ratio);let sum=0;for(let k=a;k<b;k++)sum+=input[k];write(b>a?sum/(b-a):input[a]);p+=ratio;}
+      const keep=Math.floor(p);carry=input.slice(keep);position=p-keep;};
+    source.connect(node);node.connect(context.destination);
+    return {stop:()=>stopping||(stopping=(async()=>{
+      node.port.onmessage=null;source.disconnect();node.disconnect();stream.getTracks().forEach(t=>t.stop());await context.close();
+      const durationMs=Math.round((index*size+filled)*1000/voiceRate);
+      if(filled===0)buffer[filled++]=0; // the last piece always carries a sample, so the host learns the recording ended
+      emit(true);
+      return {recording,segments:index,durationMs};})().catch(e=>{throw voiceError(e);}))};
+  }catch(error){stream.getTracks().forEach(t=>t.stop());throw error;}
+};
+export const voiceStop = voice => () => voice.stop();
 export const qrImage = text => () => RemoteVendor.QRCode.toDataURL(text,{width:320,margin:3});
 export const parseMarkup = source => {const t=document.createElement('template');t.innerHTML=source;const read=n=>n.nodeType===3?{text:n.textContent}:n.nodeType===1?{tag:n.localName,attrs:Object.fromEntries([...n.attributes].map(a=>[a.name,a.value])),children:[...n.childNodes].map(read),text:n.textContent,source:n.outerHTML}:{};return [...t.content.childNodes].map(read);};
 export const parseURL = base => value => {try{const u=new URL(value,base);return {href:u.href,origin:u.origin,protocol:u.protocol,host:u.hostname,path:u.pathname,search:u.search,hash:u.hash,username:u.username,password:u.password};}catch{return null;}};
