@@ -12,6 +12,9 @@ if (-not (Test-Path "$cache/runtimes/$Runtime/native/WebView2Loader.dll")) {
     if ((Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant() -ne '56f7f4b8bf9aee4b8efefbbdd4f67d5f74ebd1b100ed0806da71bf76af481aa9') { throw 'WebView2 package checksum mismatch' }
     Expand-Archive -LiteralPath $archive -DestinationPath $cache -Force
 }
+$loader = "$cache/runtimes/$Runtime/native/WebView2Loader.dll"
+$expected = if ($Runtime -eq 'win-arm64') { '4f48cb32d34298c86cca2108057eea0d900b5e422575e926e8086318a0b9cbf0' } else { '3426dcc55fdfb8b5e7ac623cf33b4ccf283fbf68a0c5a65bddfdb4d749a8abee' }
+if ((Get-FileHash -Algorithm SHA256 -LiteralPath $loader).Hash.ToLowerInvariant() -ne $expected) { throw 'WebView2 loader checksum mismatch' }
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
-Copy-Item -LiteralPath "$cache/runtimes/$Runtime/native/WebView2Loader.dll" -Destination $Destination -Force
+Copy-Item -LiteralPath $loader -Destination $Destination -Force
 Copy-Item -LiteralPath "$cache/LICENSE.txt" -Destination (Join-Path $Destination 'WebView2-LICENSE.txt') -Force
