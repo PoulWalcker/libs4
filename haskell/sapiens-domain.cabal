@@ -34,6 +34,7 @@ common host
     Command,
     Domain,
     RuntimePaths,
+    DataRoot,
     Assets,
     BuildUI,
     Computer,
@@ -89,55 +90,50 @@ executable sapiens-macos
   other-modules:
     Domain,
     RuntimePaths,
+    DataRoot,
+    Types,
     Application,
     Browser,
     Icon,
     ObjC
   main-is: MacMain.hs
   if os(osx)
-    c-sources: native/cocoa.c
+    c-sources: native/cocoa.c, ../../../environments/macos/Process.c
     frameworks: Cocoa, WebKit, CoreGraphics
     extra-libraries: objc
   else
     buildable: False
 
-executable sapiens-windows
+common windows-host
   import: runtime
-  hs-source-dirs: ../../../environments/windows, ../../../corpora/state
   other-modules:
     Domain,
     RuntimePaths,
+    DataRoot,
+    Types,
     Browser,
     Host,
     Native,
     Navigation,
     Shell
-  main-is: WindowsMain.hs
   if os(windows)
     c-sources: native/windows.c
-    ld-options: .build/windows-resources.o
-    ghc-options: -optl-mwindows
     extra-libraries: user32, ole32, dwmapi, comdlg32, kernel32
   else
     buildable: False
 
-executable sapiens-windows-probe
-  import: runtime
-  hs-source-dirs: ../../../spec/support, ../../../environments/windows, ../../../corpora/state
-  other-modules:
-    Domain,
-    RuntimePaths,
-    Browser,
-    Host,
-    Native,
-    Navigation,
-    Shell
-  main-is: WindowsProbeMain.hs
+executable sapiens-windows
+  import: windows-host
+  hs-source-dirs: ../../../environments/windows, ../../../corpora/state
+  main-is: WindowsMain.hs
   if os(windows)
-    c-sources: native/windows.c
-    extra-libraries: user32, ole32, dwmapi, comdlg32, kernel32
-  else
-    buildable: False
+    ld-options: .build/windows-resources.o
+    ghc-options: -optl-mwindows
+
+executable sapiens-windows-probe
+  import: windows-host
+  hs-source-dirs: ../../../spec/support, ../../../environments/windows, ../../../corpora/state
+  main-is: WindowsProbeMain.hs
 
 executable sapiens-provider
   main-is: WindowsProviderMain.hs
