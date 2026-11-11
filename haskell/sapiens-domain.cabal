@@ -86,11 +86,12 @@ executable sapiens-linux
 
 executable sapiens-macos
   import: runtime
-  hs-source-dirs: ../../../environments/macos, ../../../corpora/state
+  hs-source-dirs: ../../../environments/macos, ../../../environments, ../../../corpora/state
   other-modules:
     Domain,
     RuntimePaths,
     DataRoot,
+    DesktopStorage,
     Types,
     Application,
     Browser,
@@ -110,6 +111,7 @@ common windows-host
     Domain,
     RuntimePaths,
     DataRoot,
+    DesktopStorage,
     Types,
     Browser,
     Host,
@@ -124,7 +126,7 @@ common windows-host
 
 executable sapiens-windows
   import: windows-host
-  hs-source-dirs: ../../../environments/windows, ../../../corpora/state
+  hs-source-dirs: ../../../environments/windows, ../../../environments, ../../../corpora/state
   main-is: WindowsMain.hs
   if os(windows)
     ld-options: .build/windows-resources.o
@@ -132,7 +134,7 @@ executable sapiens-windows
 
 executable sapiens-windows-probe
   import: windows-host
-  hs-source-dirs: ../../../spec/support, ../../../environments/windows, ../../../corpora/state
+  hs-source-dirs: ../../../spec/support, ../../../environments/windows, ../../../environments, ../../../corpora/state
   main-is: WindowsProbeMain.hs
 
 executable sapiens-provider
